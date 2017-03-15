@@ -1,4 +1,4 @@
-## Data Science Specialization - Johns Hopkins University by Naman Gandhi
+## Data Science Specialization - Johns Hopkins Bloomberg School of Public Health by Naman Gandhi
 
 This repository contains the codes I had developed as part of this specialization for the following courses -
 1) The DataScientist's Toolbox
