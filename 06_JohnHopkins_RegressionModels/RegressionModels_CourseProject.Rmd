@@ -1,0 +1,109 @@
+---
+title: "Regression Models Course Project - Transmission vs. MPG"
+author: "Naman Gandhi"
+date: "February 21, 2017"
+output: pdf_document
+fontsize: 10pt
+geometry: margin=0.5in
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r init_load, echo=FALSE}
+data("mtcars")
+library(ggplot2)
+library(GGally)
+```
+
+# Executive Summary
+
+Motor Trend, a magazine about the automobile industry is looking at a data set of a collection of cars, they are interested in exploring the relationship between transmission's influence on miles per gallon (MPG). We'll use the **mtcars** dataset from R and do the analysis with objective to understand:  
+    1) **Is an automatic or manual transmission better for MPG**  
+    2) **Quantify the MPG difference between automatic and manual transmissions**
+
+**Takeaways**  
+1) Manual transmission is better for MPG by a factor of 1.8 compared to automatic transmission  
+2) Single term linear models cannot explain variance in the model, we need other variables to explain better  
+3) Means and medians for automatic and manual transmission cars are significantly different
+
+# Understanding the data - Exploratory Data Analysis
+We'll look at structure and summary of data to understand how this data looks like
+
+```{r str_summ,eval=FALSE}
+str(mtcars)
+summary(mtcars)
+```
+
+```{r head}
+head(mtcars)
+## Converting the variables to factor for better modeling
+mtcars$cyl  <- factor(mtcars$cyl)
+mtcars$vs   <- factor(mtcars$vs)
+mtcars$gear <- factor(mtcars$gear)
+mtcars$carb <- factor(mtcars$carb)
+## am - Transmission (0 = automatic, 1 = manual)
+mtcars$am   <- factor(mtcars$am,labels=c("Automatic","Manual"))
+```
+Looking at the box-plots helps us understand that transmission indeed brings an effect on MPG and automatic transmission cars have lower MPG than the Manual ones. (Appendix : Figure 1)
+
+Let's also look at **Pairwise correlations**, they will help us formulate model construct (Appendix : Figure 2)
+
+# Regression Analysis
+Let's start with **Basic Linear Regression** 
+
+```{r}
+fit1 <- lm(mpg ~ am, data=mtcars)
+coef(summary(fit1))
+summary(fit1)$r.squared
+```
+**Insights** -  
+i) The (Intercept) Estimate from the above coefficients show the mean MPG for automatic transmissions (our baseline) is 17.1 mpg while that of the manual tranmission as indicated by the "am" Estimate us 7.2 mpg higher than the baseline  
+ii) R^2 of 35% indicates a poor model fit  
+
+Let's throw in few more variables into the model, take reference from the pairwise correlation plot  
+
+**Multivariate Linear Regression**
+```{r}
+fit2 <- lm(mpg~am + cyl + disp + hp + wt, data = mtcars)
+coef(summary(fit2))
+summary(fit2)$r.squared
+f <- summary(fit2)$fstatistic # F-statistic
+(p <- pf(f[1],f[2],f[3],lower.tail=F)) # p-value
+
+## Let's do a quick analysis of variance
+anova(fit1, fit2)
+```
+
+#**Insights and Conclusion** -  
+i) This results in a p-value of 8.637e-08, and we can validate that fit2 model is significantly better than fit1 simple lm. 
+ii) Residuals for non-normality (Appendix) and can see they are all normally distributed and their is no evident heteroskedasticity.  (Appendix : Figure 3)
+iii) The model explains 86.64% of the variance and as a result, cyl, disp, hp, wt did affect the correlation between mpg and am. Thus, we can say the difference between automatic and manual transmissions is 1.81 MPG.
+
+#Appendix
+
+## Figure 1: Boxplot - Understanding Transmission as opposed to MPG
+```{r, echo=FALSE}
+cat("Mean MPG of Manual and Automatic transmission cars is ",with(data = mtcars[mtcars$am=="Manual",], mean(mpg)), "mpg and" ,with(data = mtcars[mtcars$am=="Automatic",], mean(mpg)), "mpg respectively")
+```
+
+```{r boxplot, echo=FALSE, fig.width=4, fig.height=2.8, strip.white=TRUE}
+par(mar=c(2,2,2,2))
+boxplot(mpg ~ am, data = mtcars, col = (c("orange","grey")), ylab = "Miles Per Gallon")
+```
+
+## Figure 2: Pairwise correlations
+
+```{r ggpairs, echo=FALSE, fig.width=7, fig.height=6}
+p <- ggpairs(mtcars[,c(1:7)])
+suppressMessages(print(p))
+```
+
+## Figure 3: Model Residual Plots
+
+```{r, echo=FALSE}
+cat("The Linear Regression is formulated as: mpg ~ am + cyl + disp + hp + wt")
+par(mfrow=c(2,2))
+plot(fit2)
+```
