@@ -1,0 +1,130 @@
+---
+title: "Practical Machine Learning - Course Project"
+author: "Naman Gandhi"
+date: "March 12, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+library(ggplot2)
+library(plyr)
+library(randomForest)
+library(rpart)
+library(gbm)
+set.seed(7815)
+```
+
+## Project Objectives
+#### Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+#### Data
+The training data for this project are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+Data citations -
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+Read more: http://groupware.les.inf.puc-rio.br/har#ixzz4b5dbY2Nm
+
+#### Goal
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+
+## Getting & Cleaning Data
+
+#### Step 1: Downloading the data from the source
+```{r download_data}
+train_data <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", na.strings = c("NA","#DIV/0!",""), header = T)
+test_data <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", na.strings = c("NA","#DIV/0!",""), header = T)
+```
+#### Step 2: Taking a quick look at the data
+```{r quick_look, results='hide'}
+dim(train_data)
+str(train_data) 
+summary(train_data) ## Both structure and summary highlight that couple of variables have majority NA values
+summary(train_data$classe) ## Our Y variables consists of 5 levels that we'll be interested to classify our test set into
+```
+#### Step 3: Removing the variables having zero variance or majority NAs 
+```{r data_prep}
+## Removing the near-zero variance variables
+nzv_list <- nearZeroVar(train_data)
+m_train <- train_data[,-nzv_list]
+m_test <- test_data[,-nzv_list]
+
+## Removing the variables with majority NAs
+NA_list <- sapply(m_train, function(x) mean(is.na(x))) > 0.95
+m_train <- m_train[, NA_list==FALSE]
+m_test <- m_test[, NA_list==FALSE]
+
+## Removing the first 5 housekeeping columns which will not make intuitive sense for prediction
+m_train <- m_train[,-c(1:5)]
+m_test <- m_test[,-c(1:5)]
+```
+
+
+#### Step 4: Splitting the data into train and validation (70:30 respectively)
+```{r partition}
+set.seed(7815)
+inTrain <- createDataPartition(y=m_train$classe, p=0.7, list=F)
+m_train <- m_train[inTrain, ]
+m_validation <- m_train[-inTrain, ]
+```
+## Model Building
+
+We'll use three types of algorithms to see which one provides the best **out-of-sample accuracy** (we'll use our validation test to measure score). Also, we will do a **5-fold Cross Validation** to prevent over-fitting on train set
+Let's see them one by one -
+
+#### Model 1: Decision trees with CART (rpart)
+```{r model_rpart}
+fit_cart <- train(classe ~ ., data=m_train, trControl=trainControl(method='cv', number = 5), method='rpart')
+pred_CART <- predict(fit_cart, newdata=m_validation)
+cm_CART <- confusionMatrix(pred_CART, m_validation$classe)
+```
+
+#### Model 2: Stochastic gradient boosting trees (gbm)
+```{r model_gbm, message=FALSE}
+fit_gbm <- train(classe ~ ., data=m_train, trControl=trainControl(method='cv', number = 5), method='gbm', verbose = F)
+pred_gbm <- predict(fit_gbm, newdata=m_validation)
+(cm_gbm <- confusionMatrix(pred_gbm, m_validation$classe))
+```
+
+#### Model 3: Random forest decision trees (rf)
+```{r model_rf}
+fit_rf <- train(classe ~ ., data=m_train, trControl=trainControl(method='cv', number = 5), method='rf', ntree = 500)
+pred_rf <- predict(fit_rf, newdata=m_validation)
+(cm_rf <- confusionMatrix(pred_rf, m_validation$classe))
+```
+
+#### Understanding the best model better
+```{r model_accuracy}
+(AccuracyResults <- data.frame(
+  Model = c('Decision trees with CART (rpart)', 'Stochastic gradient boosting trees (gbm)', 'Random forest decision trees (rf)'),
+  Accuracy = rbind(cm_CART$overall[1], cm_gbm$overall[1], cm_rf$overall[1])
+))
+```
+
+Looking at the grid above **Random Forest** model appears to be performing best (only marginally better than GBM models) on the out-of-sample validation set and with that near-perfect a prediction accuracy, it will be futile to do an ensemble (or mixture) model.
+Let's look at the **Variable Importance** as generated by RF models -
+
+```{r rf_varImp}
+vImp_RF <- varImp(fit_rf)$importance
+(vImp_RF[head(order(unlist(vImp_RF), decreasing = TRUE), 10L), , drop = FALSE])
+```
+
+## Model Prediction on Test set
+We'll now use the above generated model to predict on test set
+
+```{r test_pred}
+## Predict and print the results
+test_pred <- predict(fit_rf, m_test)
+(test_pred_detailed <- data.frame(X=test_data$X,Predicted_Class=test_pred))
+```
+
+## Conclusion
+The Random forest model emerged out as clear winner in terms of prediction power for our use-case of prediction "classe" variable for the wearable data. In reterospect, having more cleaner data from source would have helped us in better interpretability as currently limited 10 variables explain most variance.  
+This concludes Practical Machine Learning Coursera course!

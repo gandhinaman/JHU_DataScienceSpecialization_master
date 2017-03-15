@@ -1,0 +1,106 @@
+---
+title: "Statistical Inference Course Project - Inferential Data Analysis"
+author: "Naman Gandhi"
+date: "February 4, 2017"
+output: pdf_document
+fontsize: 10pt
+geometry: margin=0.5in
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+In this project we'll analyze the ToothGrowth data in the R datasets package.
+
+We'll break it into 4 broad sections -  
+    1) **Preparation and Data Summary**  
+    2) **Exploratory Data Analysis**   
+    3) **Inferential Analysis**  
+    4) **Assumptions and Conclusion**  
+  
+  
+Let's dive in!!
+
+## Section 1: Preparation and Data Summary
+This data analyses the effect of Vitamin C on Tooth Growth in Guinea Pigs
+```{r}
+# Loading the required libraries and dataset
+library(datasets)
+library(ggplot2)
+data("ToothGrowth")
+# Understanding the structure and dispersion of data
+str(ToothGrowth)
+summary(ToothGrowth)
+# Converting the dose to be factor to analyze it better
+ToothGrowth$dose<-as.factor(ToothGrowth$dose)
+```
+
+**Insights**  
+Each of 60 animals received one of three dose levels of vitamin C (0.5, 1, and 2 mg/day) by one of two delivery methods, (orange juice or ascorbic acid (a form of vitamin C and coded as VC).    
+
+## Section 2: Exploratory Data Analysis
+
+**Figure 1** Explains how the length of the tooth is affected by supplements, OJ stands for Orange Juice and VC - (Vit C) Ascorbic Acid
+
+```{r fig.width=7, fig.height=3}
+ggplot(aes(x=supp, y=len), data=ToothGrowth) + geom_boxplot(aes(fill=supp))+ geom_point() +
+    xlab("Supplement type") +ylab("Tooth Length") +
+    ggtitle("Figure 1: Tooth Length summarized by supplement")
+```
+
+
+
+**Figure 2** Explains how the length of the tooth grows as the dosage of the supplement increases, OJ stands for Orange Juice and VC - (Vit C) Ascorbic Acid
+```{r fig.width=7.5, fig.height=3}
+ggplot(data = ToothGrowth, aes(x = dose, y = len)) + geom_boxplot(aes(fill = dose)) + 
+    facet_grid(~ supp) + geom_point(aes(colour = I("black"))) + xlab("Dose (mg)") + 
+    ylab("Tooth Length") + ggtitle("Figure 2: Tooth Length vs. Dose, faceted by type of supplement")
+```
+
+
+## Section 3: Inferential Analysis
+We'll test the significance by performing hypothesis testing in two phases -  
+
+**3A) Testing the significance of correlation between delivery method and tooth growth  **
+
+```{r}
+t.test(len~supp,data=ToothGrowth)
+```
+**Insights** -  
+i) The p-value of this test is 0.06  which is greater than significance level of 0.05  
+ii) 95% onfidence interval contains zero  
+=> *Null Hypothesis Accepted - Supplement types seems to have no impact on Tooth growth*
+
+**3B) Testing the significance of correlation between dosage administered and tooth growth  **
+
+```{r}
+# 3B1 - Dose amounts 0.5 and 1.0
+t.test(len~dose,data=subset(ToothGrowth, ToothGrowth$dose %in% c(0.5,1.0)))
+```
+
+```{r}
+# 3B2 - Dose amounts 1.0 and 2.0
+t.test(len~dose,data=subset(ToothGrowth, ToothGrowth$dose %in% c(1.0,2.0)))
+```
+
+```{r}
+# 3B3 - Dose amounts 0.5 and 2.0
+t.test(len~dose,data=subset(ToothGrowth, ToothGrowth$dose %in% c(0.5,2.0)))
+```
+
+**Insights** -  
+i) The p-value of each of the three tests (3B1, 3B2 & 3B3) test is 0,  which is less than significance level of 0.05  
+ii) 95% onfidence interval does not contains zero (-ve in all cases)  
+=> *Null Hypothesis Rejected - Tooth length increases with an inceasing dose*
+
+
+## Section 4: Assumptions and Conclusion  
+**Assumptions**  
+i) The distribution of the sample means follows the Central Limit Theorem  
+ii) The sample is representative of the population
+
+**Conclusion**  
+Analyzing the results from the T-tests, we can conclude that supplement delivery method has no effect on tooth growth, however increased dosages do result in increased tooth length of Guinea pigs.
